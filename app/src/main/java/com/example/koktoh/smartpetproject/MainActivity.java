@@ -2,19 +2,22 @@ package com.example.koktoh.smartpetproject;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Bundle;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.PermissionChecker;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
-import android.util.Log;
-import android.widget.Toast;
-import java.util.ArrayList;
 import android.widget.ImageView;
+import android.widget.Toast;
+
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -26,8 +29,9 @@ public class MainActivity extends AppCompatActivity {
     private Intent intent;
 
     private ImageView iv;
+    private Bitmap bmp;
 
-	private class MyRecognitionListener implements RecognitionListener {
+    private class MyRecognitionListener implements RecognitionListener {
         @Override
         public void onBeginningOfSpeech() {
             Log.d(TAG, "on beginning of speech");
@@ -77,6 +81,11 @@ public class MainActivity extends AppCompatActivity {
             }
 
             Log.e(TAG, "Recognizerエラー　リスナ再登録");
+            sr.stopListening();
+            sr.destroy();
+            sr = null;
+
+            sr = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
             sr.setRecognitionListener(listener);
             sr.startListening(intent);
         }
@@ -110,19 +119,29 @@ public class MainActivity extends AppCompatActivity {
 
             if (resultList.contains("おはよう")) {
                 Log.d(TAG, "おはよう");
-
-            } else if (resultList.contains("かなしい")) {
-                Log.d(TAG, "かなしい");
-
+                releaseBitmap();
+                bmp = BitmapFactory.decodeResource(getResources(), R.drawable.face_nomal);
+                iv.setImageBitmap(bmp);
+            } else if (resultList.contains("つかれた")) {
+                Log.d(TAG, "つかれた");
+                releaseBitmap();
+                bmp = BitmapFactory.decodeResource(getResources(), R.drawable.face_tired);
+                iv.setImageBitmap(bmp);
             } else if (resultList.contains("おこる")) {
                 Log.d(TAG, "おこる");
-
+                releaseBitmap();
+                bmp = BitmapFactory.decodeResource(getResources(), R.drawable.face_angry);
+                iv.setImageBitmap(bmp);
             } else if (resultList.contains("びっくり")) {
                 Log.d(TAG, "びっくり");
-
+                releaseBitmap();
+                bmp = BitmapFactory.decodeResource(getResources(), R.drawable.face_oops);
+                iv.setImageBitmap(bmp);
             } else if (resultList.contains("おやすみ")) {
                 Log.d(TAG, "おやすみ");
-
+                releaseBitmap();
+                bmp = BitmapFactory.decodeResource(getResources(), R.drawable.face_sleep);
+                iv.setImageBitmap(bmp);
             }
             sr.stopListening();
 //            sr.destroy();
@@ -162,9 +181,10 @@ public class MainActivity extends AppCompatActivity {
             sr.startListening(intent);
         }
 
-    	iv = (ImageView) findViewById(R.id.imageView);
+        iv = (ImageView) findViewById(R.id.imageView);
+        bmp = BitmapFactory.decodeResource(getResources(), R.drawable.face_nomal);
         iv.setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
-        iv.setImageResource(R.drawable.face_nomal);
+        iv.setImageBitmap(bmp);
     }
 
     @Override
@@ -173,6 +193,7 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
         if (sr != null) {
             sr.destroy();
+            sr = null;
         }
     }
 
@@ -188,6 +209,13 @@ public class MainActivity extends AppCompatActivity {
                     this.finish();
                 }
             }
+        }
+    }
+
+    private void releaseBitmap() {
+        if (bmp != null) {
+            bmp.recycle();
+            bmp = null;
         }
     }
 }
