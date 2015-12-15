@@ -9,12 +9,12 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.PermissionChecker;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.view.Window;
+import android.view.View;
 import android.view.WindowManager;
 import android.util.Log;
 import android.widget.Toast;
-
 import java.util.ArrayList;
+import android.widget.ImageView;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -25,7 +25,9 @@ public class MainActivity extends AppCompatActivity {
     private MyRecognitionListener listener;
     private Intent intent;
 
-    private class MyRecognitionListener implements RecognitionListener {
+    private ImageView iv;
+
+	private class MyRecognitionListener implements RecognitionListener {
         @Override
         public void onBeginningOfSpeech() {
             Log.d(TAG, "on beginning of speech");
@@ -140,7 +142,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getSupportActionBar().hide();
 
         setContentView(R.layout.activity_main);
 
@@ -159,6 +161,10 @@ public class MainActivity extends AppCompatActivity {
             sr.setRecognitionListener(listener);
             sr.startListening(intent);
         }
+
+    	iv = (ImageView) findViewById(R.id.imageView);
+        iv.setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+        iv.setImageResource(R.drawable.face_nomal);
     }
 
     @Override
