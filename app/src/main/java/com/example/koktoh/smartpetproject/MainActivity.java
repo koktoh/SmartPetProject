@@ -1,14 +1,24 @@
 package com.example.koktoh.smartpetproject;
 
+import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.BatteryManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -22,6 +32,7 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -36,6 +47,63 @@ public class MainActivity extends AppCompatActivity {
     private Bitmap bmp;
 
     private int level;
+
+    private BluetoothGattCharacteristic characteristicTx = null;
+    private RBLService mBluetoothLeService;
+    private BluetoothAdapter mBluetoothAdapter;
+    private BluetoothDevice mDevice = null;
+    private String mDeviceAddress;
+
+    private boolean flag = true;
+    private boolean connState = false;
+    private boolean scanFlag = false;
+
+    private static final int REQUEST_ENABLE_BT = 1;
+    private static final long SCAN_PERIOD = 2000;
+
+    final private static char[] hexArray = {'0', '1', '2', '3', '4', '5', '6',
+            '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+    private final ServiceConnection mServiceConnection = new ServiceConnection() {
+
+        @Override
+        public void onServiceConnected(ComponentName componentName,
+                                       IBinder service) {
+            Log.d(TAG, "mBluetoothLeService set");
+            mBluetoothLeService = ((RBLService.LocalBinder) service)
+                    .getService();
+            Log.d(TAG, "mBluetoothLeService seted");
+            if (!mBluetoothLeService.initialize()) {
+                Log.e(TAG, "Unable to initialize Bluetooth");
+                finish();
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            mBluetoothLeService = null;
+        }
+    };
+
+    private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+
+            if (RBLService.ACTION_GATT_DISCONNECTED.equals(action)) {
+                Toast.makeText(getApplicationContext(), "Disconnected",
+                        Toast.LENGTH_SHORT).show();
+            } else if (RBLService.ACTION_GATT_SERVICES_DISCOVERED
+                    .equals(action)) {
+                Toast.makeText(getApplicationContext(), "Connected",
+                        Toast.LENGTH_SHORT).show();
+
+                getGattService(mBluetoothLeService.getSupportedGattService());
+            } else if (RBLService.ACTION_DATA_AVAILABLE.equals(action)) {
+            } else if (RBLService.ACTION_GATT_RSSI.equals(action)) {
+            }
+        }
+    };
 
     private class MyRecognitionListener implements RecognitionListener {
         @Override
@@ -194,6 +262,12 @@ public class MainActivity extends AppCompatActivity {
 
         listener = new MyRecognitionListener();
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_CODE);
+            }
+        }
+
         if (PermissionChecker.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Log.d(TAG, "パーミッション未許可");
             Log.d(TAG, "パーミッション許可要求");
@@ -208,6 +282,27 @@ public class MainActivity extends AppCompatActivity {
         bmp = BitmapFactory.decodeResource(getResources(), R.drawable.face_nomal);
         iv.setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
         iv.setImageBitmap(bmp);
+
+        if (!getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_BLUETOOTH_LE)) {
+            Toast.makeText(this, "Ble not supported", Toast.LENGTH_SHORT)
+                    .show();
+            finish();
+        }
+
+        final BluetoothManager mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        mBluetoothAdapter = mBluetoothManager.getAdapter();
+        if (mBluetoothAdapter == null) {
+            Toast.makeText(this, "Ble not supported", Toast.LENGTH_SHORT)
+                    .show();
+            finish();
+            return;
+        }
+
+        Intent gattServiceIntent = new Intent(MainActivity.this,
+                RBLService.class);
+        Log.d(TAG, gattServiceIntent.toString());
+        bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
     }
 
     @Override
@@ -218,6 +313,17 @@ public class MainActivity extends AppCompatActivity {
             sr.destroy();
             sr = null;
         }
+
+        flag = false;
+        unregisterReceiver(mGattUpdateReceiver);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        if (mServiceConnection != null)
+            unbindService(mServiceConnection);
     }
 
     @Override
@@ -250,6 +356,14 @@ public class MainActivity extends AppCompatActivity {
 
         filter.addAction(Intent.ACTION_BATTERY_CHANGED);
         registerReceiver(mBroadcastReceiver, filter);
+
+        if (!mBluetoothAdapter.isEnabled()) {
+            Intent enableBtIntent = new Intent(
+                    BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+        }
+
+        registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
     }
 
     @Override
@@ -257,6 +371,121 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
 
         unregisterReceiver(mBroadcastReceiver);
+    }
+
+    private void startReadRssi() {
+        new Thread() {
+            public void run() {
+
+                while (flag) {
+                    mBluetoothLeService.readRssi();
+                    try {
+                        sleep(500);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            ;
+        }.start();
+    }
+
+    private void getGattService(BluetoothGattService gattService) {
+        if (gattService == null)
+            return;
+
+        startReadRssi();
+
+        characteristicTx = gattService
+                .getCharacteristic(RBLService.UUID_BLE_SHIELD_TX);
+
+        BluetoothGattCharacteristic characteristicRx = gattService
+                .getCharacteristic(RBLService.UUID_BLE_SHIELD_RX);
+        mBluetoothLeService.setCharacteristicNotification(characteristicRx,
+                true);
+        mBluetoothLeService.readCharacteristic(characteristicRx);
+    }
+
+    private static IntentFilter makeGattUpdateIntentFilter() {
+        final IntentFilter intentFilter = new IntentFilter();
+
+        intentFilter.addAction(RBLService.ACTION_GATT_CONNECTED);
+        intentFilter.addAction(RBLService.ACTION_GATT_DISCONNECTED);
+        intentFilter.addAction(RBLService.ACTION_GATT_SERVICES_DISCOVERED);
+        intentFilter.addAction(RBLService.ACTION_DATA_AVAILABLE);
+        intentFilter.addAction(RBLService.ACTION_GATT_RSSI);
+
+        return intentFilter;
+    }
+
+    private void scanLeDevice() {
+        new Thread() {
+
+            @Override
+            public void run() {
+                mBluetoothAdapter.startLeScan(mLeScanCallback);
+
+                try {
+                    Thread.sleep(SCAN_PERIOD);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                mBluetoothAdapter.stopLeScan(mLeScanCallback);
+            }
+        }.start();
+    }
+
+    private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
+
+        @Override
+        public void onLeScan(final BluetoothDevice device, final int rssi,
+                             final byte[] scanRecord) {
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    byte[] serviceUuidBytes = new byte[16];
+                    String serviceUuid = "";
+                    for (int i = 32, j = 0; i >= 17; i--, j++) {
+                        serviceUuidBytes[j] = scanRecord[i];
+                    }
+                    serviceUuid = bytesToHex(serviceUuidBytes);
+                    if (stringToUuidString(serviceUuid).equals(
+                            RBLGattAttributes.BLE_SHIELD_SERVICE
+                                    .toUpperCase(Locale.ENGLISH))) {
+                        mDevice = device;
+                    }
+                }
+            });
+        }
+    };
+
+    private String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        int v;
+        for (int j = 0; j < bytes.length; j++) {
+            v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
+
+    private String stringToUuidString(String uuid) {
+        StringBuffer newString = new StringBuffer();
+        newString.append(uuid.toUpperCase(Locale.ENGLISH).substring(0, 8));
+        newString.append("-");
+        newString.append(uuid.toUpperCase(Locale.ENGLISH).substring(8, 12));
+        newString.append("-");
+        newString.append(uuid.toUpperCase(Locale.ENGLISH).substring(12, 16));
+        newString.append("-");
+        newString.append(uuid.toUpperCase(Locale.ENGLISH).substring(16, 20));
+        newString.append("-");
+        newString.append(uuid.toUpperCase(Locale.ENGLISH).substring(20, 32));
+
+        return newString.toString();
     }
 
     private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
