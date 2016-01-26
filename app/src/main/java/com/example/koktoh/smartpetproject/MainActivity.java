@@ -15,6 +15,7 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -98,6 +99,10 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
     private boolean playing = false;
 
     private CameraBridgeViewBase mOpenCvCameraView;
+
+    private AudioManager mAudioManager;
+    private int currentVolume = 0;
+    boolean mute = false;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -244,13 +249,9 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
             }
 
             Log.e(TAG, "Recognizerエラー リスナ再登録");
-            sr.stopListening();
-            sr.destroy();
-            sr = null;
+            releaseRecognize();
 
-            sr = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
-            sr.setRecognitionListener(listener);
-            sr.startListening(intent);
+            startRecognize();
         }
 
         @Override
@@ -266,11 +267,13 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         @Override
         public void onReadyForSpeech(Bundle params) {
             Log.d(TAG, "on ready for speech");
+            muteAudio();
         }
 
         @Override
         public void onResults(Bundle results) {
             Log.d(TAG, "on results");
+            unmuteAudio();
 
             ArrayList<String> resultList = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
 
@@ -349,12 +352,8 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                     connectLeDevice();
                 }
             }
-//            sr.stopListening();
-//            sr.destroy();
-//            sr = null;
-//            sr = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
-            sr.setRecognitionListener(listener);
-            sr.startListening(intent);
+
+            startRecognize();
         }
 
         @Override
@@ -441,9 +440,9 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mOpenCvCameraView.setCameraIndex(CameraBridgeViewBase.CAMERA_ID_FRONT);
         mOpenCvCameraView.setCvCameraViewListener(this);
 
-        if (BuildConfig.DEBUG) {
-            iv.setVisibility(View.INVISIBLE);
-        }
+//        iv.setVisibility(View.INVISIBLE);
+
+        mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
         // ATTENTION: This was auto-generated to implement the App Indexing API.
         // See https://g.co/AppIndexing/AndroidStudio for more information.
@@ -532,6 +531,8 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
 
         mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+
+        startRecognize();
     }
 
     @Override
@@ -542,6 +543,39 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
 
         if (mOpenCvCameraView != null) {
             mOpenCvCameraView.disableView();
+        }
+
+        releaseRecognize();
+    }
+
+    private void muteAudio() {
+        if (!mute) {
+            currentVolume = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0);
+            mute = true;
+        }
+    }
+
+    private void unmuteAudio() {
+        if (mute) {
+            mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, currentVolume, 0);
+            mute = false;
+        }
+    }
+
+    private void startRecognize() {
+        if (sr == null) {
+            sr = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
+        }
+        sr.setRecognitionListener(listener);
+        sr.startListening(intent);
+    }
+
+    private void releaseRecognize() {
+        if (sr != null) {
+            sr.stopListening();
+            sr.destroy();
+            sr = null;
         }
     }
 
