@@ -28,6 +28,7 @@ import android.support.v4.content.PermissionChecker;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
@@ -37,13 +38,25 @@ import com.google.android.gms.appindexing.Action;
 import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.api.GoogleApiClient;
 
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.Point;
+import org.opencv.core.Scalar;
+import org.opencv.imgproc.Imgproc;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements View.OnTouchListener, CameraBridgeViewBase.CvCameraViewListener2 {
 
     private final static String TAG = MainActivity.class.getSimpleName();
 
@@ -66,12 +79,53 @@ public class MainActivity extends AppCompatActivity {
     private boolean flag = true;
     private boolean connState = false;
     private boolean scanFlag = false;
+    private boolean motorMove = false;
 
     private static final int REQUEST_ENABLE_BT = 1;
     private static final long SCAN_PERIOD = 2000;
 
     final private static char[] hexArray = {'0', '1', '2', '3', '4', '5', '6',
             '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+    private Mat mRgba;
+    private Mat mRgbaT;
+    private Mat mRgbaF;
+    private Scalar mBlobColorHsv;
+    private ColorBlobDetector mDetector;
+    private Scalar CONTOUR_COLOR;
+    private int centerX;
+
+    private boolean playing = false;
+
+    private CameraBridgeViewBase mOpenCvCameraView;
+
+    private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
+        @Override
+        public void onManagerConnected(int status) {
+            switch (status) {
+                case LoaderCallbackInterface.SUCCESS: {
+                    Log.i(TAG, "OpenCV loaded successfully");
+                    mOpenCvCameraView.enableView();
+                    mOpenCvCameraView.setOnTouchListener(MainActivity.this);
+                }
+                break;
+                default: {
+                    super.onManagerConnected(status);
+                }
+                break;
+            }
+        }
+    };
+
+    static {
+        if (!OpenCVLoader.initDebug()) {
+            Log.d(TAG, "Failed OpenCVLoader.initDebug");
+        }
+    }
+
+    public MainActivity() {
+        Log.i(TAG, "Instantiated new " + this.getClass());
+    }
 
     private final ServiceConnection mServiceConnection = new ServiceConnection() {
 
@@ -189,7 +243,7 @@ public class MainActivity extends AppCompatActivity {
                 default:
             }
 
-            Log.e(TAG, "Recognizerエラー　リスナ再登録");
+            Log.e(TAG, "Recognizerエラー リスナ再登録");
             sr.stopListening();
             sr.destroy();
             sr = null;
@@ -267,6 +321,21 @@ public class MainActivity extends AppCompatActivity {
                     iv.setImageBitmap(bmp);
                     Toast.makeText(getApplicationContext(), "元気！", Toast.LENGTH_LONG).show();
                 }
+            } else if (resultList.contains("遊ぼう") || resultList.contains("あそぼう")) {
+                playing = true;
+                releaseBitmap();
+                bmp = BitmapFactory.decodeResource(getResources(), R.drawable.face_happy);
+                iv.setImageBitmap(bmp);
+                Toast.makeText(getApplicationContext(), "いいよ！", Toast.LENGTH_LONG).show();
+            } else if (resultList.contains("終わり") || resultList.contains("おわり")) {
+                playing = false;
+                releaseBitmap();
+                bmp = BitmapFactory.decodeResource(getResources(), R.drawable.face_nomal);
+                iv.setImageBitmap(bmp);
+                Toast.makeText(getApplicationContext(), "楽しかった！", Toast.LENGTH_LONG).show();
+            } else if (resultList.contains("お休み") || resultList.contains("おやすみ") || resultList.contains("じゃあね") || resultList.contains("ばいばい") || resultList.contains("バイバイ") || resultList.contains("さようなら") || resultList.contains("さよなら")) {
+                Toast.makeText(getApplicationContext(), "おやすみ", Toast.LENGTH_LONG).show();
+                finish();
             } else if (resultList.contains("前") || resultList.contains("まえ")) {
                 runMotor("F", 500);
             } else if (resultList.contains("後ろ") || resultList.contains("うしろ")) {
@@ -321,8 +390,12 @@ public class MainActivity extends AppCompatActivity {
                 permissionList.add(Manifest.permission.BLUETOOTH);
             }
 
-            if (this.checkSelfPermission((Manifest.permission.BLUETOOTH_ADMIN)) != PackageManager.PERMISSION_GRANTED) {
+            if (this.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED) {
                 permissionList.add(Manifest.permission.BLUETOOTH_ADMIN);
+            }
+
+            if (this.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                permissionList.add(Manifest.permission.CAMERA);
             }
 
             if (PermissionChecker.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -364,6 +437,14 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, gattServiceIntent.toString());
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
 
+        mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.javaCameraView);
+        mOpenCvCameraView.setCameraIndex(CameraBridgeViewBase.CAMERA_ID_FRONT);
+        mOpenCvCameraView.setCvCameraViewListener(this);
+
+        if (BuildConfig.DEBUG) {
+            iv.setVisibility(View.INVISIBLE);
+        }
+
         // ATTENTION: This was auto-generated to implement the App Indexing API.
         // See https://g.co/AppIndexing/AndroidStudio for more information.
         client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
@@ -402,8 +483,13 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
 
-        if (mServiceConnection != null)
+        if (mServiceConnection != null) {
             unbindService(mServiceConnection);
+        }
+
+        if (mOpenCvCameraView != null) {
+            mOpenCvCameraView.disableView();
+        }
     }
 
     @Override
@@ -444,6 +530,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
+
+        mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
     }
 
     @Override
@@ -451,9 +539,16 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
 
         unregisterReceiver(mBroadcastReceiver);
+
+        if (mOpenCvCameraView != null) {
+            mOpenCvCameraView.disableView();
+        }
     }
 
     private void runMotor(String command, long period) {
+        motorMove = true;
+        Log.i(TAG, "motorMove:" + motorMove);
+
         if (characteristicTx.setValue(command)) {
             mBluetoothLeService.writeCharacteristic(characteristicTx);
             Log.d(TAG, "Send command:" + command);
@@ -470,6 +565,9 @@ public class MainActivity extends AppCompatActivity {
             mBluetoothLeService.writeCharacteristic(characteristicTx);
             Log.d(TAG, "Stop");
         }
+
+        motorMove = false;
+        Log.i(TAG, "motorMove:" + motorMove);
     }
 
     private void startReadRssi() {
@@ -626,6 +724,104 @@ public class MainActivity extends AppCompatActivity {
         newString.append(uuid.toUpperCase(Locale.ENGLISH).substring(20, 32));
 
         return newString.toString();
+    }
+
+    public void onCameraViewStarted(int width, int height) {
+        mRgba = new Mat(height, width, CvType.CV_8UC4);
+        mRgbaF = new Mat(height, width, CvType.CV_8UC4);
+        mRgbaT = new Mat(width, width, CvType.CV_8UC4);
+        mDetector = new ColorBlobDetector();
+        CONTOUR_COLOR = new Scalar(0, 255, 0, 255);
+//        mBlobColorHsv = new Scalar(30, 250, 200, 0);    // 黄色
+        mBlobColorHsv = new Scalar(240, 240, 200, 0);   // 赤
+        mDetector.setHsvColor(mBlobColorHsv);
+        centerX = width / 2;
+    }
+
+    public void onCameraViewStopped() {
+        mRgba.release();
+    }
+
+    public boolean onTouch(View v, MotionEvent event) {
+        return false;
+    }
+
+    ;
+
+    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        mRgba = inputFrame.rgba();
+
+        Core.transpose(mRgba, mRgbaT);
+        Imgproc.resize(mRgbaT, mRgbaF, mRgbaF.size(), 0, 0, 0);
+        Core.flip(mRgbaF, mRgba, 0);
+
+        if (playing) {
+            try {
+                mDetector.process(mRgba);
+                List<MatOfPoint> contours = mDetector.getContours();
+                Log.i(TAG, "Contours count: " + contours.size());
+                Imgproc.drawContours(mRgba, contours, -1, CONTOUR_COLOR);
+
+                MatOfPoint mop = contours.get(0);
+                double xMin = mop.get(0, 0)[0];
+                double xMax = mop.get(0, 0)[0];
+                double yMin = mop.get(0, 0)[1];
+                double yMax = mop.get(0, 0)[1];
+                for (int i = 0; i < mop.rows(); i++) {
+                    for (int j = 0; j < mop.cols(); j++) {
+                        double[] temp = mop.get(i, j);
+                        if (temp[0] < xMin) {
+                            xMin = temp[0];
+                        }
+                        if (temp[0] > xMax) {
+                            xMax = temp[0];
+                        }
+                        if (temp[1] < yMin) {
+                            yMin = temp[1];
+                        }
+                        if (temp[1] > yMax) {
+                            yMax = temp[1];
+                        }
+                    }
+                }
+
+                double x = xMin + (xMax - xMin) / 2;
+                double y = yMin + (yMax - yMin) / 2;
+
+                Point p = new Point(x, y);
+                Scalar color = new Scalar(0, 0, 255, 255);
+                Core.circle(mRgba, p, 20, color, 2);
+
+                double distance = centerX - x;
+                Log.i(TAG, "distance:" + distance);
+                Core.line(mRgba, p, new Point(centerX, y), color, 2);
+
+                double area = mDetector.getArea();
+                Log.i(TAG, "area:" + area);
+
+                System.out.println(!motorMove);
+                if (connState && !motorMove) {
+                    if (distance < -100) {
+                        Log.d(TAG, "right");
+                        runMotor("R", 25);
+                    } else if (distance > 100) {
+                        Log.d(TAG, "left");
+                        runMotor("L", 25);
+                    } else {
+                        if (area < 1000) {
+                            runMotor("F", 25);
+                        } else if (area > 2000) {
+                            runMotor("B", 25);
+                        }
+                    }
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, e.getMessage());
+            }
+        }
+
+        return mRgba;
     }
 
     private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
