@@ -15,6 +15,7 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -26,13 +27,21 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.PermissionChecker;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.google.android.gms.appindexing.Action;
+import com.google.android.gms.appindexing.AppIndex;
+import com.google.android.gms.common.api.GoogleApiClient;
+
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -93,6 +102,7 @@ public class MainActivity extends AppCompatActivity {
             if (RBLService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 Toast.makeText(getApplicationContext(), "Disconnected",
                         Toast.LENGTH_SHORT).show();
+                connState = false;
             } else if (RBLService.ACTION_GATT_SERVICES_DISCOVERED
                     .equals(action)) {
                 Toast.makeText(getApplicationContext(), "Connected",
@@ -104,6 +114,31 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    private GoogleApiClient client;
+
+    @Override
+    public void onStart() {
+        super.onStart();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client.connect();
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "Main Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app deep link URI is correct.
+                Uri.parse("android-app://com.example.koktoh.smartpetproject/http/host/path")
+        );
+        AppIndex.AppIndexApi.start(client, viewAction);
+    }
 
     private class MyRecognitionListener implements RecognitionListener {
         @Override
@@ -232,6 +267,18 @@ public class MainActivity extends AppCompatActivity {
                     iv.setImageBitmap(bmp);
                     Toast.makeText(getApplicationContext(), "元気！", Toast.LENGTH_LONG).show();
                 }
+            } else if (resultList.contains("前") || resultList.contains("まえ")) {
+                runMotor("F", 500);
+            } else if (resultList.contains("後ろ") || resultList.contains("うしろ")) {
+                runMotor("B", 500);
+            } else if (resultList.contains("右") || resultList.contains("みぎ")) {
+                runMotor("R", 500);
+            } else if (resultList.contains("左") || resultList.contains("ひだり")) {
+                runMotor("L", 500);
+            } else if (resultList.contains("接続")) {
+                if (connState == false) {
+                    connectLeDevice();
+                }
             }
 //            sr.stopListening();
 //            sr.destroy();
@@ -244,6 +291,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onRmsChanged(float rmsdB) {
         }
+
     }
 
     @Override
@@ -262,20 +310,32 @@ public class MainActivity extends AppCompatActivity {
 
         listener = new MyRecognitionListener();
 
+        List<String> permissionList = new ArrayList<>();
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_CODE);
+                permissionList.add(Manifest.permission.ACCESS_COARSE_LOCATION);
             }
-        }
 
-        if (PermissionChecker.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "パーミッション未許可");
-            Log.d(TAG, "パーミッション許可要求");
-            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.RECORD_AUDIO}, REQUEST_CODE);
-        } else {
-            sr = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
-            sr.setRecognitionListener(listener);
-            sr.startListening(intent);
+            if (this.checkSelfPermission(Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
+                permissionList.add(Manifest.permission.BLUETOOTH);
+            }
+
+            if (this.checkSelfPermission((Manifest.permission.BLUETOOTH_ADMIN)) != PackageManager.PERMISSION_GRANTED) {
+                permissionList.add(Manifest.permission.BLUETOOTH_ADMIN);
+            }
+
+            if (PermissionChecker.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                permissionList.add(Manifest.permission.RECORD_AUDIO);
+            } else {
+                sr = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
+                sr.setRecognitionListener(listener);
+                sr.startListening(intent);
+            }
+
+            if (permissionList.size() > 0) {
+                requestPermissions(permissionList.toArray(new String[permissionList.size()]), REQUEST_CODE);
+            }
         }
 
         iv = (ImageView) findViewById(R.id.imageView);
@@ -303,12 +363,29 @@ public class MainActivity extends AppCompatActivity {
                 RBLService.class);
         Log.d(TAG, gattServiceIntent.toString());
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
 
     @Override
     protected void onStop() {
         Log.d(TAG, "on stop");
         super.onStop();
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "Main Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app deep link URI is correct.
+                Uri.parse("android-app://com.example.koktoh.smartpetproject/http/host/path")
+        );
+        AppIndex.AppIndexApi.end(client, viewAction);
         if (sr != null) {
             sr.destroy();
             sr = null;
@@ -316,6 +393,9 @@ public class MainActivity extends AppCompatActivity {
 
         flag = false;
         unregisterReceiver(mGattUpdateReceiver);
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client.disconnect();
     }
 
     @Override
@@ -373,6 +453,25 @@ public class MainActivity extends AppCompatActivity {
         unregisterReceiver(mBroadcastReceiver);
     }
 
+    private void runMotor(String command, long period) {
+        if (characteristicTx.setValue(command)) {
+            mBluetoothLeService.writeCharacteristic(characteristicTx);
+            Log.d(TAG, "Send command:" + command);
+        }
+
+        try {
+            Thread.sleep(period);
+            Log.d(TAG, "Sleep " + period);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        if (characteristicTx.setValue("S")) {
+            mBluetoothLeService.writeCharacteristic(characteristicTx);
+            Log.d(TAG, "Stop");
+        }
+    }
+
     private void startReadRssi() {
         new Thread() {
             public void run() {
@@ -395,6 +494,7 @@ public class MainActivity extends AppCompatActivity {
         if (gattService == null)
             return;
 
+        connState = true;
         startReadRssi();
 
         characteristicTx = gattService
@@ -417,6 +517,46 @@ public class MainActivity extends AppCompatActivity {
         intentFilter.addAction(RBLService.ACTION_GATT_RSSI);
 
         return intentFilter;
+    }
+
+    private void connectLeDevice() {
+        scanLeDevice();
+
+        Timer mTimer = new Timer();
+        mTimer.schedule(new TimerTask() {
+
+            @Override
+            public void run() {
+                if (mDevice != null) {
+                    Log.d(TAG, "mDevice exists");
+                    mDeviceAddress = mDevice.getAddress();
+                    mBluetoothLeService.connect(mDeviceAddress);
+                    scanFlag = true;
+                } else {
+                    Log.d(TAG, "mDevice not exists");
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            Toast toast = Toast
+                                    .makeText(
+                                            MainActivity.this,
+                                            "Couldn't search Ble Shiled device!",
+                                            Toast.LENGTH_SHORT);
+                            toast.setGravity(0, 0, Gravity.CENTER);
+                            toast.show();
+                        }
+                    });
+                }
+            }
+        }, SCAN_PERIOD);
+
+        System.out.println(connState);
+        if (connState == false) {
+            mBluetoothLeService.connect(mDeviceAddress);
+        } else {
+            mBluetoothLeService.disconnect();
+            mBluetoothLeService.close();
+            connState = false;
+        }
     }
 
     private void scanLeDevice() {
