@@ -580,12 +580,20 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
     }
 
     private void runMotor(String command, long period) {
+        if (motorMove) {
+            return;
+        }
+
         motorMove = true;
         Log.i(TAG, "motorMove:" + motorMove);
 
         if (characteristicTx.setValue(command)) {
             mBluetoothLeService.writeCharacteristic(characteristicTx);
             Log.d(TAG, "Send command:" + command);
+        }
+
+        if (period <= 0) {
+            return;
         }
 
         try {
@@ -595,13 +603,20 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
             e.printStackTrace();
         }
 
+        stopMotor();
+    }
+
+    private void stopMotor() {
+        if (!motorMove) {
+            return;
+        }
+
         if (characteristicTx.setValue("S")) {
             mBluetoothLeService.writeCharacteristic(characteristicTx);
-            Log.d(TAG, "Stop");
+            Log.d(TAG, "motor stop");
         }
 
         motorMove = false;
-        Log.i(TAG, "motorMove:" + motorMove);
     }
 
     private void startReadRssi() {
@@ -834,19 +849,23 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 Log.i(TAG, "area:" + area);
 
                 System.out.println(!motorMove);
-                if (connState && !motorMove) {
-                    if (distance < -100) {
-                        Log.d(TAG, "right");
-                        runMotor("R", 25);
-                    } else if (distance > 100) {
-                        Log.d(TAG, "left");
-                        runMotor("L", 25);
-                    } else {
-                        if (area < 1000) {
-                            runMotor("F", 25);
-                        } else if (area > 2000) {
-                            runMotor("B", 25);
+                if (connState) {
+                    if (!motorMove) {
+                        if (distance < -200) {
+                            Log.d(TAG, "right");
+                            runMotor("R", 0);
+                        } else if (distance > 200) {
+                            Log.d(TAG, "left");
+                            runMotor("L", 0);
+                        } else {
+                            if (area < 1000) {
+                                runMotor("F", 0);
+                            } else if (area > 2000) {
+                                runMotor("B", 0);
+                            }
                         }
+                    } else {
+                        stopMotor();
                     }
                 }
 
