@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<items version="2" >
+
+    <item
+        jar="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\exploded-aar\com.android.support\appcompat-v7\23.1.1\jars\classes.jar"
+        jumboMode="false"
+        revision="23.0.2"
+        sha1="5c5699834e9722f1c288fea2de82725d078ba127">
+        <dex dex="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\pre-dexed\debug\com.android.support-appcompat-v7-23.1.1_e8d6fb8e9689a20f8f834cf3f65440829d41ac28.jar" />
+    </item>
+    <item
+        jar="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\exploded-aar\com.android.support\support-v4\23.1.1\jars\libs\internal_impl-23.1.1.jar"
+        jumboMode="false"
+        revision="23.0.2"
+        sha1="a4de9c81ae239414e1ed0f86441b02abaf29bca9">
+        <dex dex="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\pre-dexed\debug\internal_impl-23.1.1_f030875e71f0ba619406443a28ea08207f71946f.jar" />
+    </item>
+    <item
+        jar="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\exploded-aar\Android\openCVLibrary2411\unspecified\jars\classes.jar"
+        jumboMode="false"
+        revision="23.0.2"
+        sha1="601e4d466ae1ac010a8062c76e7a0bf80df6f7b7">
+        <dex dex="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\pre-dexed\debug\Android-openCVLibrary2411-unspecified_d60ce16f4f3e34e4846fb61120c4b83640cd8faf.jar" />
+    </item>
+    <item
+        jar="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\exploded-aar\com.google.android.gms\play-services-basement\8.1.0\jars\classes.jar"
+        jumboMode="false"
+        revision="23.0.2"
+        sha1="d0dda274b703dd9c5bb056867649d22b4171ae7d">
+        <dex dex="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\pre-dexed\debug\com.google.android.gms-play-services-basement-8.1.0_c8d2833a1cdb58615a3b28b3a0807d39e85f19ec.jar" />
+    </item>
+    <item
+        jar="C:\Users\kuroda\AppData\Local\Android\sdk\extras\android\m2repository\com\android\support\support-annotations\23.1.1\support-annotations-23.1.1.jar"
+        jumboMode="false"
+        revision="23.0.2"
+        sha1="8d680ba5a623724d1fb0e81c36a790f023a6cede">
+        <dex dex="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\pre-dexed\debug\support-annotations-23.1.1_30622f3b7ab5c2aa4bcc3b0a9fa4781c7708d8dd.jar" />
+    </item>
+    <item
+        jar="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\exploded-aar\com.google.android.gms\play-services-appindexing\8.1.0\jars\classes.jar"
+        jumboMode="false"
+        revision="23.0.2"
+        sha1="4477ea44f5ec5ad064022a22691732d7638ff197">
+        <dex dex="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\pre-dexed\debug\com.google.android.gms-play-services-appindexing-8.1.0_be623e2c6285fd2bdf1c262c657a2884dd7bda7e.jar" />
+    </item>
+    <item
+        jar="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\exploded-aar\com.android.support\support-v4\23.1.1\jars\classes.jar"
+        jumboMode="false"
+        revision="23.0.2"
+        sha1="6cbc7773921fcfedbe55657578f0cbfe614778dc">
+        <dex dex="C:\Users\kuroda\Documents\GitHub\SmartPetProject\Android\app\build\intermediates\pre-dexed\debug\com.android.support-support-v4-23.1.1_82ef841d9cfef96dae42a63aa6c863f919e18aa6.jar" />
+    </item>
+
+</items>
