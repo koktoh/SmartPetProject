@@ -340,13 +340,13 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 Toast.makeText(getApplicationContext(), "おやすみ", Toast.LENGTH_LONG).show();
                 finish();
             } else if (resultList.contains("前") || resultList.contains("まえ")) {
-                runMotor("F", 500);
+                runMotor("F", 255, 500);
             } else if (resultList.contains("後ろ") || resultList.contains("うしろ")) {
-                runMotor("B", 500);
+                runMotor("B", 255, 500);
             } else if (resultList.contains("右") || resultList.contains("みぎ")) {
-                runMotor("R", 500);
+                runMotor("R", 255, 500);
             } else if (resultList.contains("左") || resultList.contains("ひだり")) {
-                runMotor("L", 500);
+                runMotor("L", 255, 500);
             } else if (resultList.contains("接続")) {
                 if (connState == false) {
                     connectLeDevice();
@@ -440,7 +440,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mOpenCvCameraView.setCameraIndex(CameraBridgeViewBase.CAMERA_ID_FRONT);
         mOpenCvCameraView.setCvCameraViewListener(this);
 
-//        iv.setVisibility(View.INVISIBLE);
+        iv.setVisibility(View.INVISIBLE);
 
         mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
@@ -579,7 +579,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         }
     }
 
-    private void runMotor(String command, long period) {
+    private void runMotor(String command, int pwm, long period) {
         if (motorMove) {
             return;
         }
@@ -587,9 +587,17 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         motorMove = true;
         Log.i(TAG, "motorMove:" + motorMove);
 
-        if (characteristicTx.setValue(command)) {
+        if (pwm < 0) {
+            pwm = 0;
+        }
+
+        if (255 < pwm) {
+            pwm = 255;
+        }
+
+        if (characteristicTx.setValue(command + String.format("%1$03d", pwm))) {
             mBluetoothLeService.writeCharacteristic(characteristicTx);
-            Log.d(TAG, "Send command:" + command);
+            Log.d(TAG, "Send command:" + command + ":" + pwm);
         }
 
         if (period <= 0) {
@@ -848,20 +856,26 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 double area = mDetector.getArea();
                 Log.i(TAG, "area:" + area);
 
+                int pwm = 0;
+
                 System.out.println(!motorMove);
                 if (connState) {
                     if (!motorMove) {
                         if (distance < -200) {
+                            pwm = (int) (-distance / centerX * 128 + 127);
                             Log.d(TAG, "right");
-                            runMotor("R", 0);
+                            runMotor("R", pwm, 0);
                         } else if (distance > 200) {
+                            pwm = (int) (distance / centerX * 128 + 127);
                             Log.d(TAG, "left");
-                            runMotor("L", 0);
+                            runMotor("L", pwm, 0);
                         } else {
                             if (area < 1000) {
-                                runMotor("F", 0);
+                                pwm = (int) (area / 1000 * 128 + 127);
+                                runMotor("F", pwm, 0);
                             } else if (area > 2000) {
-                                runMotor("B", 0);
+                                pwm = (int) (area / 2000 * 128 + 127);
+                                runMotor("B", pwm, 0);
                             }
                         }
                     } else {

@@ -30,36 +30,36 @@ void allLow() {
   digitalWrite(10, LOW);
 }
 
-void goForward() {
+void goForward(int i) {
   Serial.write("go forward\n");
 
   allLow();
-  digitalWrite(5, HIGH);
-  digitalWrite(9, HIGH);
+  analogWrite(5, i);
+  analogWrite(9, i);
 }
 
-void goBackward() {
+void goBackward(int i) {
   Serial.write("go backward\n");
 
   allLow();
-  digitalWrite(6, HIGH);
-  digitalWrite(10, HIGH);
+  analogWrite(6, i);
+  analogWrite(10, i);
 }
 
-void turnRight() {
+void turnRight(int i) {
   Serial.write("turn right\n");
 
   allLow();
-  digitalWrite(5, HIGH);
-  digitalWrite(10, HIGH);
+  analogWrite(5, i);
+  analogWrite(10, i);
 }
 
-void turnLeft() {
+void turnLeft(int i) {
   Serial.write("turn left\n");
 
   allLow();
-  digitalWrite(6, HIGH);
-  digitalWrite(9, HIGH);
+  analogWrite(6, i);
+  analogWrite(9, i);
 }
 
 void loop() {
@@ -67,18 +67,20 @@ void loop() {
     byte cmd;
     cmd = ble_read();
 
+    int data = ble_read() * 100 + ble_read() * 10 + ble_read();
+
     switch (cmd) {
       case 'F':
-        goForward();
+        goForward(data);
         break;
       case 'B':
-        goBackward();
+        goBackward(data);
         break;
       case 'R':
-        turnRight();
+        turnRight(data);
         break;
       case 'L':
-        turnLeft();
+        turnLeft(data);
         break;
       case 'S':
         allLow();
